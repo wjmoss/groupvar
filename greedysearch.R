@@ -155,12 +155,11 @@ fastGreedySearch <- function(mg.start, part, n, covMat, maxSteps=Inf, max.in.deg
         #(i,j) entry
         j <- ceiling(pos / p)
         i <- (pos - 1) %% p + 1
-        if (i == j) {
-          print(poslist)
+        #if (i == j) {
+          #print(poslist)
           #print(pos)
           #stop("Error!")
-        }
-
+        #}
 
         #add directed edge, two directions
         newstate <- state
@@ -252,8 +251,14 @@ fastGreedySearch <- function(mg.start, part, n, covMat, maxSteps=Inf, max.in.deg
       best.a.score <- -Inf
     }
 
+    # if some block has no nodes, the score is NaN and best.d is integer(0)
     if (i.d > 0){
       best.d <- which.max(sapply(1:i.d, function(j) cand.del[[j]]$score))
+      #if (isTRUE(best.d==0)) stop("!")
+      #print(c(i.d, best.d))
+      #print(cand.del[[2]]$scores)
+      #print(part)
+      #print(best.d)
       best.d.score <- cand.del[[best.d]]$score
     } else{
       best.d <- NULL
@@ -312,7 +317,7 @@ greedySearch <- function(
   n,
   mg.start = NULL,
   part,
-  n.restarts = 0,
+  n.restarts = 1,
   mc.cores = 1,
   max.steps = 10,
   max.in.degree = 5,
@@ -331,10 +336,10 @@ greedySearch <- function(
 
   # list of start mixed graphs
   mg.list <- if(is.null(mg.start)){
-    GenerateGraph(p, N=n.restarts + 1, p1=1, max.in.degree=2, names=rownames(cov.mat))
+    GenerateGraph(p, N=n.restarts, p1=1, max.in.degree=2, names=rownames(cov.mat))
   } else{
     if (class(mg.start) == "list"){
-      if (length(mg.start) == n.restarts + 1) mg.start else sample(mg.start, n.restarts + 1, replace = TRUE)
+      if (length(mg.start) == n.restarts) mg.start else sample(mg.start, n.restarts, replace = TRUE)
     } else{
       stop("Invalid starting graphs")
     }
@@ -364,21 +369,182 @@ greedySearch <- function(
 
     res <- if(mc.cores > 1){
       doParallel::registerDoParallel(cores = mc.cores)
-      foreach::foreach(i = 1:(n.restarts + 1)) %dopar% { oneRep(i) }
+      foreach::foreach(i = 1:(n.restarts)) %dopar% { oneRep(i) }
     } else{
-      lapply(1:(n.restarts + 1), oneRep)
+      lapply(1:(n.restarts), oneRep)
     }
 
     #return (res)
-    i.best <- which.max(sapply(1:(n.restarts+1), function(j) res[[j]]$score))
+    i.best <- which.max(sapply(1:(n.restarts), function(j) res[[j]]$score))
     list(
       # must use "=", otherwise the attribute names are not saved
       final.mg = res[[i.best]]$mg,
       final.score = res[[i.best]]$score,
-      #all.mgs <- lapply(1:n.restarts+1, function(obj){lapply(1:length(obj$states), function(state){state$mg})} ),
+      #all.mgs <- lapply(1:n.restarts, function(obj){lapply(1:length(obj$states), function(state){state$mg})} ),
       all.mgs = lapply(res, function(obj) lapply(obj$states, function(state) state$mg) ),
       all.scores = lapply(res, function(obj) sapply(obj$states, function(state) state$score) ),
       all.times = lapply(res, function(obj) sapply(obj$states, function(state) state$ct))
     )
 }
 
+
+# modified from pcalg.R, line 590
+computeCPDAG <- function(mg, phase=1){
+  if (phase == 1){
+    # without backgound knowledge, mg is a dag and need to be changed to a cpdag
+    mg[mg != 0] <- 1
+    skel <- mg + t(mg)
+    skel[skel == 2] <- 1
+    cpdag <- skel
+  }
+  else {
+    # with background knowledge, mg is a pdag
+    cpdag <- mg
+  }
+
+
+  ## search the v-structures in the DAG
+  ind <- which((mg == 1 & t(mg) == 0), arr.ind = TRUE)
+  tripleMatrix <- matrix(,0,3)
+  ## Go through all edges
+  for (i in seq_len(nrow(ind))) { ## MM(FIXME): growth of tripleMatrix
+    x <- ind[i,1]
+    y <- ind[i,2]
+    indY <- setdiff(which((mg[,y] == 1 & mg[y,] == 0), arr.ind = TRUE),x) ## x-> y <- z
+    if(length(newZ <- indY[mg[x,indY] == 0])) ## deparse.l.=0: no colnames
+      tripleMatrix <- rbind(tripleMatrix, cbind(x, y, newZ, deparse.level=0), deparse.level=0)
+  }
+  if ((m <- nrow(tripleMatrix)) > 0) {
+    deleteDupl <- logical(m)# all FALSE
+    for (i in seq_len(m))
+        if (tripleMatrix[i,1] > tripleMatrix[i,3])
+          deleteDupl[i] <- TRUE
+    if(any(deleteDupl))
+      tripleMatrix <- tripleMatrix[!deleteDupl,, drop=FALSE]
+
+    ## orient the v-structures in the CPDAG
+    for (i in seq_len(nrow(tripleMatrix))) {
+      x <- tripleMatrix[i,1]
+      y <- tripleMatrix[i,2]
+      z <- tripleMatrix[i,3]
+      cpdag[x,y] <- cpdag[z,y] <- 1
+      cpdag[y,x] <- cpdag[y,z] <- 0
+    }
+  }
+
+  ## orient the edges with the 3 orientation rules
+  repeat{
+    old_cpdag <- cpdag
+    ## rule 1
+    ind <- which((cpdag == 1 & t(cpdag) == 0), arr.ind = TRUE)
+    for (i in seq_len(nrow(ind))){
+      a <- ind[i, 1]
+      b <- ind[i, 2]
+      isC <- ((cpdag[b, ] == 1 & cpdag[, b] == 1) &
+              (cpdag[a, ] == 0 & cpdag[, a] == 0))
+      if (any(isC)){
+        indC <- which(isC)
+        cpdag[b, indC] <- 1
+        cpdag[indC, b] <- 0
+      }
+    }
+    ## rule 2
+    ind <- which((cpdag == 1 & t(cpdag) == 1), arr.ind = TRUE)
+    for (i in seq_len(nrow(ind))){
+      a <- ind[i, 1]
+      b <- ind[i, 2]
+      isC <- ((cpdag[a, ] == 1 & cpdag[, a] == 0) &
+              (cpdag[b, ] == 0 & cpdag[, b] == 1))
+      if (any(isC)){
+        cpdag[a, b] <- 1
+        cpdag[b, a] <- 0
+      }
+    }
+    ## rule 3
+    ind <- which((cpdag == 1 & t(cpdag) == 1), arr.ind = TRUE)
+    for (i in seq_len(nrow(ind))){
+      a <- ind[i, 1]
+      b <- ind[i, 2]
+      indC <- which((cpdag[a, ] == 1 & cpdag[, a] == 1) &
+              (cpdag[b, ] == 0 & cpdag[, b] == 1))
+      if (length(indC) >= 2) {
+        cmb.C <- combn(indC, 2) # all 2-pairs in indC
+        cC1 <- cmb.C[1, ]
+        cC2 <- cmb.C[2, ]
+        for (j in seq_along(cC1)){
+          c1 <- cC1[j]
+          c2 <- cC2[j]
+          if (c1 != c2 && cpdag[c1, c2] == 0 && cpdag[c2,c1] == 0) {
+            cpdag[a, b] <- 1
+            cpdag[b, a] <- 0
+            break
+          }
+        }
+      }
+    }
+    ## if phase == 2, rule 4
+    if (phase == 2){
+      ind <- which((cpdag == 1 & t(cpdag) == 1), arr.ind = TRUE)
+      for (i in seq_len(nrow(ind))){
+        a <- ind[i, 1]
+        b <- ind[i, 2]
+        indC <- which((cpdag[a, ] == 1 & cpdag[, a] == 1) &
+          (cpdag[b, ] == 0 & cpdag[, b] == 1))
+        for (c in indC){
+          indD <- ((cpdag[c, ] == 0 & cpdag[, c] == 1) &
+            (cpdag[a, ] == 1 & cpdag[, a] == 1))
+          if (any(indD)){
+            cpdag[a, b] <- 1
+            cpdag[b, a] <- 0
+            break
+          }
+        }
+      }
+    }
+    if (all(cpdag == old_cpdag))
+      break
+  }
+  return (cpdag)
+}
+
+
+computeCPDAG_bk <- function(mg, part=NULL){
+  cpdag <- computeCPDAG(mg, phase=1)
+  if (is.null(part))
+    return (cpdag)
+  else{
+    for (i in unique(part)){
+      ind <- which(part == i)
+      if (length(ind) > 1){
+        for (j in ind){
+          cpdag[j, ] <- mg[j, ]
+          cpdag[, j] <- mg[, j]
+        }
+      }
+    }
+    #return (cpdag)
+    return (computeCPDAG(cpdag, phase=2))
+  }
+}
+
+
+computeSHD <- function(mg1, mg2){
+  if (nrow(mg1) != ncol(mg1) | nrow(mg2)!=ncol(mg2))
+    stop("DAG or CPDAG must be a square matrix!")
+  if (nrow(mg1) != nrow(mg2))
+    stop("The two graph must have the same number of nodes!")
+  shd <- 0
+  s1 <- mg1 + t(mg1)
+  s2 <- mg2 + t(mg2)
+  s1[s1 == 2] <- 1
+  s2[s2 == 2] <- 1
+  ds <- s1 - s2
+  ind <- which(ds > 0)
+  mg1[ind] <- 0
+  shd <- shd + length(ind) / 2
+  ind <- which(ds < 0)
+  mg1[ind] <- mg2[ind]
+  shd <- shd + length(ind) / 2
+  d <- abs(mg1 - mg2)
+  shd + sum((d + t(d)) > 0) # dist+=2 for each pair of reversed edges
+}
