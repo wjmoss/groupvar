@@ -1,33 +1,64 @@
+# Title     : simdata
+# Objective : script for running simulations with given inputing parameters
+# Created by: wj
+# Created on: 2022/3/2
+
+rm(list = ls())
+
+## source files and required packages
 source("generate.R")
 source("greedysearch.R")
-source("plotting.R")
 
+# "C:/Users/wj/Documents/R/win-library/4.0"
+# "C:/Program Files/R/R-4.0.5/library"
+.libPaths("C:/Users/wj/Documents/R/win-library/4.0")
+.libPaths()
 library(pcalg)
 library(doParallel)
 
 
-## parameters for randomly generating
-p=10
-n=100
-#prob=3/(2*p-2)
-prob=0.3
-mc.cores = 1
-max.steps = 100
-equivalent.eps = 1e-10
-verbose = FALSE
-Bdist="sunif"
+## on windows: Rscript simdata.R p=5 n=100 sp="s"
+## on linux: R CMD BATCH --no-save '--args p=5 n=100 sp="s"' test.R test.out &
+args <- commandArgs(trailingOnly = TRUE)
+#p = args[1]
+#n = args[2]
+#sp = args[3]
+#print(p)
+
+if(length(args)==0){
+    print("No arguments supplied.")
+    ##supply default values
+    p = 5
+    n = 100
+    sp = 's'
+} else{
+  for(i in 1:length(args)){
+    eval(parse(text=args[[i]]))
+  }
+}
+
+if (sp == 's'){
+  prob = 3/(2*p-2)
+} else if (sp == 'd'){
+  prob = 0.3
+} else{
+  stop("Invalid arguments!")
+}
+
+#equivalent.eps = 1e-10
+#verbose = FALSE
 Oscale=1
 faithful.eps=0
-pop.version=FALSE
 bic="std_bic"
-
+#pop.version=FALSE (for constraint based algorithm, tbd)
 
 ## parameters for greedy search
-replicate = 10 # number of replicate, for computing statistical properties
-R = 5  # number of restarts in the greedy search algorithms, in each single replicate
-M = 1   # number of cores in the parallelization
-maxSteps = Inf # maximum greedy search steps
-max.in.degree = Inf
+replicate = 100 # number of replicate, for computing statistical properties
+n.restarts = 5  # number of restarts in the greedy search algorithms, in each single replicate
+mc.cores = 1   # number of cores in the parallelization
+max.steps = Inf # maximum greedy search steps
+max.in.degree = Inf # maximum in-degree (number of parents)
+neighbourhood.size = 300 # the maximum size of searching neighborhood
 
 
 ## T: random ground truth, F: fix
@@ -35,13 +66,14 @@ randomgraph = T
 ## T: randomstart, F: true graph start
 randomstart = T
 
-res <- list()
 
-#different seed can be set
+## different seed can be fixed
 seed <- 1
 set.seed(seed)
 
 
+## run simulations
+res <- list()
 for (r in 1:replicate){
   # >= p/3 blocks
   while (T){
@@ -54,18 +86,19 @@ for (r in 1:replicate){
   if (randomgraph){
     gt <- GenerateGT(p, prob=prob, part, max.in.degree=2, Oscale, faithful.eps=faithful.eps)
   } else{
+    # tbd: load some 0-1 matrix data?
     G <- matrix(0, p, p)
     tmp <- GenerateParams(mg=G, part=part, Oscale=1)
     gt <- list()
     gt$mg <- G
-    gt$params$B <- tmp$B
-    gt$params$Omega <- tmp$Omega
-    gt$covMat <- GetSigma(tmp)
+    gt$params$L <- tmp$L
+    gt$params$O <- tmp$O
+    gt$covmat <- GetSigma(tmp)
   }
 
-  ## generate data, n*p
+  ## generate data, n*p, compute empirical covariance matrix
   data <- GenerateData(n, gt$params)
-  covMat <- cov(data)
+  covmat <- cov(data)
 
   res[[r]] <- list()
   res[[r]]$part <- part
@@ -74,7 +107,7 @@ for (r in 1:replicate){
   res[[r]]$cpdag <- computeCPDAG_bk(gt$mg, part=part)
   if (randomstart){
     mg.start <- NULL
-  } else{
+  } else {
     mg.start <- gt$mg
   }
 
@@ -83,61 +116,31 @@ for (r in 1:replicate){
   ges.fit <- ges(score)
   res[[r]]$ges.fit <- as(ges.fit$essgraph, "matrix") * 1
 
-  ## pc, select the bset alpha according to BIC
-  #suffstat <- list(C = cov2cor(cov(data)), n = n)
-  #alpha <- 1e-5 # Compute the path, starting with this value of alpha
-  #alpha.base <- 1.1 # The next value of alpha is alpha * 1.1
-  #path <- list()
-  #counter <- 1
-  #while (T) {
-    #pc.fit <- pc(suffStat = suffstat, indepTest = gaussCItest, alpha = alpha, p = nV)
-    #est.cpdag <- as(pc.fit@graph, "matrix") * 1
-    #if(sum(est.cpdag) == 0) {
-      #alpha <- alpha * alpha.base
-      #next()
-    #}
-    #mat <- as(pc.fit, "matrix")
-    #cpdag <- as(as(mat, "graphNEL"), "EssGraph")
-    ## generate a dag in the mec and compute bic?
-    #
-    # Record these results
-    #path[[counter]] <- list()
-    #path[[counter]]$alpha <- alpha
-    #path[[counter]]$bic <- score
-
-    #counter <- counter + 1
-    #alpha <- alpha * alpha.base
-    #if (alpha > 0.8) {
-      #break()
-    #}
-  #}
 
   ## ges-ev
   res[[r]]$ev_path <- greedySearch(
-    cov.mat = covMat,
+    cov.mat = covmat,
     mg.start = mg.start,
     part = rep(1,p),
-    #gt$mg
     n = n,
-    n.restarts = R,
-    max.steps = maxSteps,
+    n.restarts = n.restarts,
+    max.steps = max.steps,
     max.in.degree = max.in.degree,
-    neighbourhood.size = 300,
-    mc.cores = M
+    neighbourhood.size = neighbourhood.size,
+    mc.cores = mc.cores
   )
   res[[r]]$gesev.fit <- res[[r]]$ev_path$final.mg
 
   ## ges-gev, save the search path
   res[[r]]$gev_path <- greedySearch(
-    cov.mat = covMat,
+    cov.mat = covmat,
     mg.start = mg.start,
     part = part,
-    #gt$mg
     n = n,
-    n.restarts = R,
-    max.steps = maxSteps,
+    n.restarts = n.restarts,
+    max.steps = max.steps,
     max.in.degree = max.in.degree,
-    mc.cores = M
+    mc.cores = mc.cores
   )
   res[[r]]$gesgev.fit <- computeCPDAG_bk(res[[r]]$gev_path$final.mg, part)
   print(r)
@@ -147,22 +150,15 @@ for (r in 1:replicate){
   score <- res[[r]]$gev_path$final.score
   n.edges <- sum(final.mg)
   res[[r]]$loglike_gt <- sum( mvtnorm::dmvnorm(data, sigma=GetSigma(gt$params), log=TRUE) ) / n
-  if (bic == "ext_bic"){
-    res[[r]]$loglike_est <- score + set.edge.penalty * (log(n)/2/n * (n.edges + p)) - (n.edges + p) * (2*log(p) + log(3)) / n
-  }
-  else{
-    res[[r]]$loglike_est <- score + set.edge.penalty * (log(n)/2/n * (n.edges + p))
-  }
+  res[[r]]$loglike_est <- score + set.edge.penalty * (log(n)/2/n * (n.edges + p))
 
   # record best graph in each replicate?
   #if (i==50) {save(file = paste("tmp.p=", p, "n=", n, "seed1", ".RData"), res)}
 
 }
 
-#save(file = paste("p=", p, "n=", n, "seed=", seed, ".RData"), res)
 
-
-# compute shd
+## compute structural Hamming distances
 err <- matrix(0,3, r, dimnames=list(c('gev','ev','nv')))
 for (r in 1:replicate){
   err['gev', r] <- computeSHD(res[[r]]$gesgev.fit, res[[r]]$cpdag)
@@ -172,5 +168,7 @@ for (r in 1:replicate){
   #err[5, r] <- shd(as(res[[r]]$gesev.fit,"graphNEL"), as(res[[r]]$cpdag, "graphNEL"))
   #err[6, r] <- shd(as(res[[r]]$ges.fit,"graphNEL"), as(res[[r]]$cpdag, "graphNEL"))
 }
-apply(err, 1, mean)
-sapply(res, function(x) x$n.edges)
+err.avg <- apply(err, 1, mean)
+#sapply(res, function(x) x$n.edges)
+
+save(file = paste("p=", p, "n=", n, "sp=", sp, "seed=", seed, ".RData"), res, err, err.avg)

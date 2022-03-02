@@ -49,5 +49,7 @@ po/*~
 # PyCharm .idea folder
 .idea/
 
-# draft versions
+# drafts and temporary data
 draft*.R
+*.RData
+*.out

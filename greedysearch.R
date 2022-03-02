@@ -219,6 +219,10 @@ fastGreedySearch <- function(mg.start, part, n, covMat, maxSteps=Inf, max.in.deg
         #(i,j) entry
         j <- ceiling(pos / p)
         i <- (pos - 1) %% p + 1
+        # check covered edge and prune equivalent DAGs
+        if ((sum(part == part[i]) == 1) & (sum(part == part[j]) == 1) &
+          (all(state$mg[, i] == state$mg[, j])))
+          next()
 
         #reverse direction
         newstate <- state
