@@ -546,5 +546,6 @@ computeSHD <- function(mg1, mg2){
   mg1[ind] <- mg2[ind]
   shd <- shd + length(ind) / 2
   d <- abs(mg1 - mg2)
+  #shd + sum((d + t(d)) > 0)/2 #this line is for classical shd, same as that in pcalg
   shd + sum((d + t(d)) > 0) # dist+=2 for each pair of reversed edges
 }

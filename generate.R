@@ -1,4 +1,23 @@
-#generate a simple mixed graph uniformly, by MCMC sampling
+#generate a DAG with a given adjacency probability
+GenerateGraph_prob <- function(p, prob, max.in.degree=Inf, names=paste("V", 1:p, sep="")){
+  mg <- matrix(0, p, p)
+  for(j in 1:(p-1)){
+    for(i in (j+1):p){
+       if((mg[i, j] != 1) & (mg[j, i]!= 1)){
+         U <- runif(1)
+         if(U < prob)
+           mg[i, j] <- 1
+       }
+    }
+  }
+  reorder <- sample(p)
+  mg <- mg[reorder, reorder]
+  rownames(mg) <- names
+  colnames(mg) <- names
+  return (mg)
+}
+
+#generate a DAG uniformly, by MCMC sampling
 GenerateGraph <- function(p, N=1, iter=p^4, p1=1, max.in.degree=Inf, names=paste("V", 1:p, sep="")){
   # p1: P(directed | empty) = P(empty | directed)
   # 1-p1: P(bidirected | empty) = P(empty | bidirected)
@@ -30,6 +49,8 @@ GenerateGraph <- function(p, N=1, iter=p^4, p1=1, max.in.degree=Inf, names=paste
       #no edge in [i,j]
       if (indegree_j){
         mg[i,j] <- 1
+        if (!ggm::isAcyclic(mg))
+          mg[i,j] <- 0
       }
     }
       # an edge
@@ -100,9 +121,10 @@ isFaithful <- function(mg, Lhat, Ohat, Shat, faithful.eps) {
 
 
 # generate ground truth
-GenerateGT <- function(p, part, max.in.degree=Inf, Oscale=1, faithful.eps=0, paramsign = "posneg"){
+GenerateGT <- function(p, prob, part, max.in.degree=Inf, Oscale=1, faithful.eps=0, paramsign = "posneg"){
   res <- list()
-  res$mg <- GenerateGraph(p, N=1, max.in.degree=max.in.degree)[[1]]
+  #res$mg <- GenerateGraph(p, N=1, max.in.degree=max.in.degree)[[1]]
+  res$mg <- GenerateGraph_prob(p, prob, max.in.degree=max.in.degree)
   res$params <- GenerateParams(mg=res$mg, part=part, Oscale=Oscale, paramsign = paramsign)
   while (! isFaithful(res$mg, t(res$params$L), res$params$O, GetSigma(res$params), 10*faithful.eps)$flag) {
     print("Ground Truth not faithgful - regenerating...")

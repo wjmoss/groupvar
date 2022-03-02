@@ -3,12 +3,14 @@ source("greedysearch.R")
 source("plotting.R")
 
 library(pcalg)
+library(doParallel)
 
 
 ## parameters for randomly generating
 p=10
-#part=c(1,1,2,2,3,3)
-n=1000
+n=100
+#prob=3/(2*p-2)
+prob=0.3
 mc.cores = 1
 max.steps = 100
 equivalent.eps = 1e-10
@@ -25,7 +27,7 @@ replicate = 10 # number of replicate, for computing statistical properties
 R = 5  # number of restarts in the greedy search algorithms, in each single replicate
 M = 1   # number of cores in the parallelization
 maxSteps = Inf # maximum greedy search steps
-max.in.degree = 2
+max.in.degree = Inf
 
 
 ## T: random, F: fix
@@ -48,9 +50,9 @@ for (r in 1:replicate){
       break()
   }
 
-  ## generate graph
+  ## generate ground truth
   if (randomgraph){
-    gt <- GenerateGT(p, part, max.in.degree=1, Oscale, faithful.eps=faithful.eps)
+    gt <- GenerateGT(p, prob=prob, part, max.in.degree=2, Oscale, faithful.eps=faithful.eps)
   } else{
     G <- matrix(0, p, p)
     tmp <- GenerateParams(mg=G, part=part, Oscale=1)
@@ -66,7 +68,10 @@ for (r in 1:replicate){
   covMat <- cov(data)
 
   res[[r]] <- list()
+  res[[r]]$part <- part
   res[[r]]$graph <- gt
+  res[[r]]$n.edges <- sum(gt$mg)
+  res[[r]]$cpdag <- computeCPDAG_bk(gt$mg, part=part)
   if (randomstart){
     mg.start <- NULL
   } else{
@@ -133,7 +138,7 @@ for (r in 1:replicate){
     max.in.degree = max.in.degree,
     mc.cores = M
   )
-  res[[r]]$gesgev.fit <- res[[r]]$gev_path$final.mg
+  res[[r]]$gesgev.fit <- computeCPDAG_bk(res[[r]]$gev_path$final.mg, part)
   print(r)
 
   ## save loglikelihoods
@@ -154,3 +159,17 @@ for (r in 1:replicate){
 }
 
 #save(file = paste("p=", p, "n=", n, "seed=", seed, ".RData"), res)
+
+
+# compute shd
+err <- matrix(0,3, r, dimnames=list(c('gev','ev','nv')))
+for (r in 1:replicate){
+  err['gev', r] <- computeSHD(res[[r]]$gesgev.fit, res[[r]]$cpdag)
+  err['ev', r] <- computeSHD(res[[r]]$gesev.fit, res[[r]]$cpdag)
+  err['nv', r] <- computeSHD(res[[r]]$ges.fit, res[[r]]$cpdag)
+  #err[4, r] <- shd(as(res[[r]]$gesgev.fit, "graphNEL"), as(res[[r]]$cpdag, "graphNEL"))
+  #err[5, r] <- shd(as(res[[r]]$gesev.fit,"graphNEL"), as(res[[r]]$cpdag, "graphNEL"))
+  #err[6, r] <- shd(as(res[[r]]$ges.fit,"graphNEL"), as(res[[r]]$cpdag, "graphNEL"))
+}
+apply(err, 1, mean)
+sapply(res, function(x) x$n.edges)
