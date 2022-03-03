@@ -11,8 +11,8 @@ source("greedysearch.R")
 
 # "C:/Users/wj/Documents/R/win-library/4.0"
 # "C:/Program Files/R/R-4.0.5/library"
-.libPaths("C:/Users/wj/Documents/R/win-library/4.0")
-.libPaths()
+#.libPaths("C:/Users/wj/Documents/R/win-library/4.0")
+#.libPaths()
 library(pcalg)
 library(doParallel)
 
@@ -20,22 +20,9 @@ library(doParallel)
 ## on windows: Rscript simdata.R p=5 n=100 sp="s"
 ## on linux: R CMD BATCH --no-save '--args p=5 n=100 sp="s"' test.R test.out &
 args <- commandArgs(trailingOnly = TRUE)
-#p = args[1]
-#n = args[2]
-#sp = args[3]
-#print(p)
-
-if(length(args)==0){
-    print("No arguments supplied.")
-    ##supply default values
-    p = 5
-    n = 100
-    sp = 's'
-} else{
-  for(i in 1:length(args)){
-    eval(parse(text=args[[i]]))
-  }
-}
+p = as.numeric(args[1])
+n = as.numeric(args[2])
+sp = as.character(args[3])
 
 if (sp == 's'){
   prob = 3/(2*p-2)
@@ -171,4 +158,5 @@ for (r in 1:replicate){
 err.avg <- apply(err, 1, mean)
 #sapply(res, function(x) x$n.edges)
 
-save(file = paste("p=", p, "n=", n, "sp=", sp, "seed=", seed, ".RData"), res, err, err.avg)
+save(file = paste0("p=", p, "n=", n, "sp=", sp, "seed=", seed, ".RData"), res, err, err.avg)
+

@@ -18,22 +18,25 @@ args <- commandArgs(trailingOnly = TRUE)
 ## First check to see if arguments are passed.
 ## Then cycle through each element of the list and evaluate the expressions.
 if(length(args)==0){
-    print("No arguments supplied.")
-    ##supply default values
-    a = 1
-    b = c(1,1,1)
-    c='ss'
+  print("No arguments supplied.")
+  ##supply default value
+  a = 1
+  b = c(1,1,1)
+  c='ss'
 }else{
-    for(i in 1:length(args)){
-      eval(parse(text=args[[i]]))
-    }
+  for(i in 1:3){
+    print(args[[i]])
+    eval(parse(text=args[[i]]))
+  }
 }
 
-print(a*2)
-print(b*3)
-print(c)
-.libPaths()
-version
+#print(a*2)
+#print(b*3)
+#print(c)
+#d = args[[4]]
+#print(eval(parse(text=d)))
+#.libPaths()
+#version
 
 #print(args[1])
 #print(args[2])

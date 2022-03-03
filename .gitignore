@@ -50,6 +50,7 @@ po/*~
 .idea/
 
 # drafts and temporary data
-draft*.R
+*draft*.R
 *.RData
 *.out
+!/simdraft.R
