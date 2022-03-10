@@ -53,4 +53,7 @@ po/*~
 *draft*.R
 *.RData
 *.out
-!/simdraft.R
+simdraft.R
+*.sh
+experiment.R
+*.txt
