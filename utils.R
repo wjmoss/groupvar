@@ -142,7 +142,7 @@ computeCPDAG_bk <- function(mg, part=NULL){
 
 
 # shd with dist += 2 for an edge reversal, modified from pcalg
-computeSHD <- function(mg1, mg2){
+computeSHD <- function(mg1, mg2, reversal=1){
   if (nrow(mg1) != ncol(mg1) | nrow(mg2)!=ncol(mg2))
     stop("DAG or CPDAG must be a square matrix!")
   if (nrow(mg1) != nrow(mg2))
@@ -160,8 +160,11 @@ computeSHD <- function(mg1, mg2){
   mg1[ind] <- mg2[ind]
   shd <- shd + length(ind) / 2
   d <- abs(mg1 - mg2)
-  #shd + sum((d + t(d)) > 0)/2 #this line is for classical shd, same as that in pcalg
-  shd + sum((d + t(d)) > 0) # dist+=2 for each pair of reversed edges
+  if (reversal == 1){
+    shd + sum((d + t(d)) > 0)/2 #this line is for classical shd, same as that in pcalg
+  } else {
+    shd + sum((d + t(d)) > 0) # dist+=2 for each pair of reversed edges
+  }
 }
 
 
@@ -169,15 +172,26 @@ computeSHD <- function(mg1, mg2){
 # helper
 validation <- function(mg, i, j){
   if (mg[i, j] == 0){
+    # if not i->j, exchange i and j
     tmp <- j
     j <- i
     i <- tmp
   }
-  pa <- which(mg[-i, j] == 1)
+  pa <- which(mg[, j] == 1)
+  pa <- pa[pa != i]
+  #pa <- which(mg[-i, j] == 1) # indices may change!
   #pa <- setdiff(pa, i)
+
+  # new unshielded collider triples -- return false
   if (length(pa) > 0 & any( (mg+t(mg))[pa, i] == 0) )
     return (F)
-  return (T)
+
+  tmp <- mg
+  tmp[tmp == 10] <- 0
+  if (ggm::isAcyclic(tmp)){
+    return (T)
+  }
+  return (F)
 }
 
 
@@ -198,18 +212,18 @@ cpdag_repr <- function(cpdag){
       mg[i, j] <- 1
       mg[j, i] <- 0
     } else {
-      mg[i, j] <- 0
-      mg[j, i] <- 1
-    }
-    if (validation(mg, i, j)){
-      k <- k + 1
-    } else {
-      if (mg[i, j] <- 1){
+      if (mg[i, j] == 1){
         mg[i, j] <- 0
         mg[j, i] <- 1
       } else {
+        mg[i, j] <- mg[j, i] <- 10
         k <- k - 1
+        next()
       }
+
+    }
+    if (validation(mg, i, j)){
+      k <- k + 1
     }
   }
 }

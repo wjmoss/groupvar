@@ -56,3 +56,4 @@ po/*~
 *.sh
 experiment.R
 *.txt
+data/

@@ -73,7 +73,7 @@ GenerateGraph <- function(p, N=1, iter=p^4, p1=1, max.in.degree=Inf, names=paste
 }
 
 
-GenerateParams <- function(Linit=NULL, mg=NULL, part=NULL, L.lb=0.5, L.ub=0.9,
+GenerateParams <- function(Linit=NULL, mg=NULL, part=NULL, L.lb=0.3, L.ub=1,
                            O.lb=0.3, O.ub=1, Oscale=1, paramsign='posneg'){
   if (is.null(Linit)){
     Linit <- mg

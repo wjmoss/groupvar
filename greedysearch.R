@@ -327,8 +327,8 @@ greedySearch <- function(
   max.in.degree = 5,
   neighbourhood.size = Inf,  # max.pos
   eps.conv = 1e-12,
-  dags.only = FALSE,
   direction = "both",
+  edge.penalty = set.edge.penalty,
   verbose = FALSE,
   bic="std_bic"
 )
@@ -365,6 +365,7 @@ greedySearch <- function(
       max.in.degree = max.in.degree,
       direction = directionMap[direction],
       covMat = cov.mat,
+      edge.penalty = edge.penalty,
       verbose = verbose,
       max.pos = neighbourhood.size,
       eps.conv = eps.conv,
