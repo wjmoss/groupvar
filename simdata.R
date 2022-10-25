@@ -1,5 +1,5 @@
 # Title     : simdata
-# Objective : script for running simulations with given inputing parameters
+# Objective : script for running simulations with given input parameters
 # Created by: wj
 # Created on: 2022/3/2
 
@@ -14,6 +14,8 @@ source("utils.R")
 # "C:/Program Files/R/R-4.0.5/library"
 #.libPaths("C:/Users/wj/Documents/R/win-library/4.0")
 #.libPaths()
+#.libPaths("/home/m4/libraryR.3.6")
+.libPaths("/home/wuju/linux/R/x86_64-pc-linux-gnu-library/4.1")
 library(pcalg)
 library(doParallel)
 
@@ -56,7 +58,7 @@ neighbourhood.size = 300 # the maximum size of searching neighborhood
 ## T: random ground truth, F: fix
 randomgraph = T
 ## T: randomstart, F: true graph start
-randomstart = T
+randomstart = F
 
 
 ## different seed can be fixed
@@ -67,10 +69,10 @@ set.seed(seed)
 ## run simulations
 res <- list()
 for (r in 1:replicate){
-  # >= p/3 blocks
+  # >= p/3+1 blocks
   while (T){
-    part <- sample(ceiling(p/3), p, replace = T)
-    if (length(unique(part)) == ceiling(p/3))
+    part <- sample(ceiling(p/3)+1, p, replace = T)
+    if (length(unique(part)) == ceiling(p/3)+1)
       break()
   }
 
@@ -103,7 +105,7 @@ for (r in 1:replicate){
     mg.start <- gt$mg
   }
 
-  score <- new("GaussL0penObsScore", data, lambda =  0.5*log(nrow(data)))
+  score <- new("GaussL0penObsScore", data, lambda =  0.5*log(nrow(data)) )
 
   ## ges
   start.time <- Sys.time()
@@ -179,14 +181,21 @@ for (r in 1:replicate){
 
   ## ges-gev, save the search path
   start.time <- Sys.time()
+  suffstat <- list(C = cor(data), n = n)
+  pc.fit <- pc(suffStat = suffstat, indepTest = gaussCItest, alpha = 0.1, p = p,
+               u2pd='retry', verbose=F, skel.method="stable")
+  est.cpdag <- as(pc.fit@graph, "matrix") * 1
+  onedag <- cpdag_repr(est.cpdag)
   res[[r]]$gev_path <- greedySearch(
     cov.mat = covmat,
-    mg.start = mg.start,
+    #mg.start = list(matrix(0,p,p)),
+    mg.start = list(onedag),
     part = part,
     n = n,
     n.restarts = n.restarts,
     max.steps = max.steps,
     max.in.degree = max.in.degree,
+    neighbourhood.size = neighbourhood.size,
     mc.cores = mc.cores
   )
   end.time <- Sys.time()
@@ -236,7 +245,18 @@ err2.avg <- apply(err2, 1, mean)
 #mean(sapply(1:replicate, function(r) res[[r]]$pc.cumtime))
 #mean(sapply(1:replicate, function(r) res[[r]]$gev.time))
 
+# time
+time.taken <- matrix(0, 3, replicate, dimnames=list(c('ges_gev','pc','ges_nv')))
+for (r in 1:replicate){
+  time.taken['ges_gev', ] <- sapply(1:replicate, function(r) res[[r]]$gev.time)
+  time.taken['pc', ] <- sapply(1:replicate, function(r) res[[r]]$pc.cumtime)
+  time.taken['ges_nv', ] <- sapply(1:replicate, function(r) res[[r]]$ges.time)
+}
+time.avg <- apply(time.taken, 1, mean)
+time.max <- apply(time.taken, 1, max)
+
+
 Sys.time()
-fnm <- paste0("./data/p=", p, "n=", n, "sp=", sp, "seed=", seed, ".RData")
+fnm <- paste0("./empty_stdbic/p=", p, "n=", n, "sp=", sp, "seed=", seed, ".RData")
 save(file=fnm,res, err1, err1.avg, err2, err2.avg)
 

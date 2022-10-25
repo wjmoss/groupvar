@@ -1,3 +1,8 @@
+# to do: 
+# regression with smaller condition number
+# search code in Rcpp
+# one run of addition and deletion?
+
 # default setups
 set.edge.penalty = 1
 bic = "std_bic"
@@ -14,8 +19,11 @@ computeOmega <- function(mg, part, k, covMat){
   omega <- 0
   for (i in ind){
     pa <- which(mg[, i] != 0)
+    #Q <- qr.q(qr(covMat[pa, pa])
+    #omega <- omega + sum(covMat[pa, i]^2) - sum((t(Q) %*% covMat[pa, i])^2)
+    #sum(y^2)-sum((t(Q) %*% y)^2)
     alpha <- solve(covMat[pa, pa], covMat[pa, i])
-    err <- err + covMat[i,i] - t(alpha) %*% covMat[pa, i]
+    omega <- omega + covMat[i,i] - t(alpha) %*% covMat[pa, i]
   }
   omega <- omega / length(ind)
   return (omega)
@@ -29,7 +37,7 @@ partScore <- function(mg, part, k, n, covMat, edge.penalty=set.edge.penalty, bic
   # n: sample size
   # covMat: sample covariance matrix
   # edge.penalty: hyperparameter lambda
-  # bic: std_bic or ext_bic
+  # bic: std_bic or ext_bic 
 
   p <- ncol(mg)
   ind <- which(part == k)
@@ -38,7 +46,7 @@ partScore <- function(mg, part, k, n, covMat, edge.penalty=set.edge.penalty, bic
   for (i in ind){
     pa <- which(mg[, i] != 0)
     if (length(pa) > 0){
-      alpha <- solve(covMat[pa, pa], covMat[pa, i])
+      alpha <- qr.solve(covMat[pa, pa], covMat[pa, i])
       omega <- omega + covMat[i,i] - t(alpha) %*% covMat[pa, i]
     }
     else{
@@ -48,10 +56,15 @@ partScore <- function(mg, part, k, n, covMat, edge.penalty=set.edge.penalty, bic
   omega <- omega / length(ind)
 
   n.edges <- sum(mg[, ind] != 0)
-  score <- -0.5 * (length(ind) * omega + length(ind)) # second part is a cst, omit?
+  score <- -0.5 * (length(ind) * log(omega) + length(ind)) # second part is a cst, omit?
 
   if (bic == 'std_bic'){
-    score <- score - edge.penalty * (log(n)/2/n * (n.edges + p))
+    score <- score - edge.penalty * log(n)/n/2 * (n.edges+1) 
+    # need to add log(n)/n/2 * p to match the bic in pcalg
+    # AllClasses.R line 854: pp.dat$lambda*(1 + length(parents))
+  }
+  else if (bic == 'ext_bic') {
+    score <- score - edge.penalty * log(n)/n/2 * (n.edges+1) - log(choose(p,2)) / n * n.edges
   }
   else {
     stop("Other penalty is not implemented yet!")
@@ -113,19 +126,17 @@ fastGreedySearch <- function(mg.start, part, n, covMat, maxSteps=Inf, max.in.deg
     nnames <- colnames(mg.start)
   }
 
-  #initial score
-  # Compute initial score
-  #score <- computeScore(mg.start, covMat, n, maxIter, edge.penalty, faithful.eps=faithful.eps, W=W, bic = bic)
+  # compute initial score
   scores <- c()
   for (k in 1:max(part)){
     scores[k] <- partScore(mg.start, part, k, n, covMat, edge.penalty, bic = bic)
   }
   score <- sum(scores)
 
-  #greedy search
+  # greedy search
   iter <- 1
 
-  #state
+  # state
   state <- list()
   state$mg <- mg.start
   state$scores <- scores
@@ -144,7 +155,7 @@ fastGreedySearch <- function(mg.start, part, n, covMat, maxSteps=Inf, max.in.deg
     # 3 -- both
     # <=3 do edge reversal
 
-    #forward
+    # forward
     cand.add <- list()
     i.a <- 0
     if (direction != 2){
@@ -161,7 +172,7 @@ fastGreedySearch <- function(mg.start, part, n, covMat, maxSteps=Inf, max.in.deg
           #stop("Error!")
         #}
 
-        #add directed edge, two directions
+        # add directed edge, two directions
         newstate <- state
         newstate$mg[i,j] <- 1
         if (sum(newstate$mg[,j]) <= max.in.degree && ggm::isAcyclic(newstate$mg)) {
@@ -186,7 +197,7 @@ fastGreedySearch <- function(mg.start, part, n, covMat, maxSteps=Inf, max.in.deg
       }
     }
 
-    #backward
+    # backward
     cand.del <- list()
     i.d <- 0
     if (direction != 1){
@@ -197,7 +208,7 @@ fastGreedySearch <- function(mg.start, part, n, covMat, maxSteps=Inf, max.in.deg
         j <- ceiling(pos / p)
         i <- (pos - 1) %% p + 1
 
-        #delete edge
+        # delete edge
         newstate <- state
         newstate$mg[i,j] <- newstate$mg[j,i] <- 0
         k <- part[j]
@@ -208,7 +219,7 @@ fastGreedySearch <- function(mg.start, part, n, covMat, maxSteps=Inf, max.in.deg
       }
     }
 
-    #edge type change
+    # edge type change
     cand.cha <- list()
     i.c <- 0
     if (direction <= 3){
@@ -224,7 +235,7 @@ fastGreedySearch <- function(mg.start, part, n, covMat, maxSteps=Inf, max.in.deg
           (all(state$mg[, i] == state$mg[, j])))
           next()
 
-        #reverse direction
+        # reverse direction
         newstate <- state
         newstate$mg[i,j] <- 0
         newstate$mg[j,i] <- 1
@@ -246,7 +257,7 @@ fastGreedySearch <- function(mg.start, part, n, covMat, maxSteps=Inf, max.in.deg
       }
     }
 
-    # Compare candidates and select best one
+    # compare candidates and select best one
     if (i.a > 0){
       best.a <- which.max(sapply(1:i.a, function(j) cand.add[[j]]$score))
       best.a.score <- cand.add[[best.a]]$score
@@ -279,10 +290,10 @@ fastGreedySearch <- function(mg.start, part, n, covMat, maxSteps=Inf, max.in.deg
 
     states[[iter]] <- state
 
-    # Break out of loop, if no improvement of score is possible
+    # break out of loop, if no improvement of score is possible
     if (max(best.a.score, best.d.score, best.c.score) <= state$score + eps.conv) break
 
-    #Otherwise change state to best candidate
+    # otherwise change state to best candidate
     ind <- which.max(c(best.a.score, best.d.score, best.c.score))
     if (ind == 1){
       state <- cand.add[[best.a]]
@@ -325,7 +336,7 @@ greedySearch <- function(
   mc.cores = 1,
   max.steps = 10,
   max.in.degree = 5,
-  neighbourhood.size = Inf,  # max.pos
+  neighbourhood.size = Inf, #max.pos,
   eps.conv = 1e-12,
   direction = "both",
   edge.penalty = set.edge.penalty,
@@ -338,7 +349,7 @@ greedySearch <- function(
   if (is.null(colnames(cov.mat))) colnames(cov.mat) <- 1:ncol(cov.mat)
   if (is.null(rownames(cov.mat))) rownames(cov.mat) <- 1:nrow(cov.mat)
 
-  # list of start mixed graphs
+  # list of start graphs
   mg.list <- if(is.null(mg.start)){
     GenerateGraph(p, N=n.restarts, p1=1, max.in.degree=2, names=rownames(cov.mat))
   } else{
@@ -355,7 +366,7 @@ greedySearch <- function(
     "both" = 3
   )
 
-  #one replication of greedy search, at start graph i
+  # one replication of greedy search, at start graph i
   oneRep <- function(i)
     fastGreedySearch(
       mg.list[[i]],
@@ -379,7 +390,7 @@ greedySearch <- function(
       lapply(1:(n.restarts), oneRep)
     }
 
-    #return (res)
+    # return (res)
     i.best <- which.max(sapply(1:(n.restarts), function(j) res[[j]]$score))
     list(
       # must use "=", otherwise the attribute names are not saved
