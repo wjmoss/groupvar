@@ -10,11 +10,6 @@ source("generate.R")
 source("greedysearch.R")
 source("utils.R")
 
-# "C:/Users/wj/Documents/R/win-library/4.0"
-# "C:/Program Files/R/R-4.0.5/library"
-#.libPaths("C:/Users/wj/Documents/R/win-library/4.0")
-#.libPaths()
-#.libPaths("/home/m4/libraryR.3.6")
 .libPaths("/home/wuju/linux/R/x86_64-pc-linux-gnu-library/4.1")
 library(pcalg)
 library(doParallel)
@@ -27,9 +22,6 @@ p = as.numeric(args[1])
 n = as.numeric(args[2])
 sp = as.character(args[3])
 
-#p=10
-#n=100
-#sp='s'
 
 if (sp == 's'){
   prob = 3/(2*p-2)
@@ -53,7 +45,6 @@ mc.cores = 1   # number of cores in the parallelization
 max.steps = Inf # maximum greedy search steps
 max.in.degree = Inf # maximum in-degree (number of parents)
 neighbourhood.size = 300 # the maximum size of searching neighborhood
-
 
 ## T: random ground truth, F: fix
 randomgraph = T
