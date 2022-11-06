@@ -1,7 +1,7 @@
 # Title     : simdata
 # Objective : script for running simulations with given input parameters
 # Created by: wj
-# Created on: 2022/3/2
+# Created on: 2022/11/6
 
 rm(list = ls())
 
@@ -16,7 +16,7 @@ library(doParallel)
 
 
 ## on windows: Rscript simdata.R p=5 n=100 sp="s"
-## on linux: R CMD BATCH --no-save '--args p=5 n=100 sp="s"' test.R test.out &
+## on linux: R CMD BATCH --no-save '--args p=5 n=100 sp="s"' simdata.R simdata.out &
 args <- commandArgs(trailingOnly = TRUE)
 p = as.numeric(args[1])
 n = as.numeric(args[2])
@@ -172,15 +172,15 @@ for (r in 1:replicate){
 
   ## ges-gev, save the search path
   start.time <- Sys.time()
-  suffstat <- list(C = cor(data), n = n)
-  pc.fit <- pc(suffStat = suffstat, indepTest = gaussCItest, alpha = 0.1, p = p,
-               u2pd='retry', verbose=F, skel.method="stable")
-  est.cpdag <- as(pc.fit@graph, "matrix") * 1
-  onedag <- cpdag_repr(est.cpdag)
+  #suffstat <- list(C = cor(data), n = n)
+  #pc.fit <- pc(suffStat = suffstat, indepTest = gaussCItest, alpha = 0.1, p = p,
+               #u2pd='retry', verbose=F, skel.method="stable")
+  #est.cpdag <- as(pc.fit@graph, "matrix") * 1
+  #onedag <- cpdag_repr(est.cpdag)
   res[[r]]$gev_path <- greedySearch(
     cov.mat = covmat,
-    #mg.start = list(matrix(0,p,p)),
-    mg.start = list(onedag),
+    mg.start = list(matrix(0,p,p)),
+    #mg.start = list(onedag),
     part = part,
     n = n,
     n.restarts = n.restarts,
@@ -248,6 +248,6 @@ time.max <- apply(time.taken, 1, max)
 
 
 Sys.time()
-fnm <- paste0("./empty_stdbic/p=", p, "n=", n, "sp=", sp, "seed=", seed, ".RData")
+fnm <- paste0("./empty_stdbic/p=", p, "n=", n, "sp=", sp, "seed=", seed, blocks, ".RData")
 save(file=fnm,res, err1, err1.avg, err2, err2.avg)
 
