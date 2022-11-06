@@ -4,14 +4,19 @@ Greedy search algorithm for Gaussian linear structural equation models with grou
 
 
 # files
-generate.R: graph and data generation\\
-greedysearch.R: search algorithm\\
-simdata.R: currently used main function for simulations\\
-start.sh: start the simulations\\
+generate.R: graph and data generation
 
-make_plot.R, theme_for_plots.R: result visualisation\\
+greedysearch.R: search algorithm
 
-plotting.R: to plot CPDAG, could be put in utils?\\
+simdata.R: currently used main function for simulations
+
+start.sh: start the simulations
+
+make_plot.R, theme_for_plots.R: result visualisation
+
+
+plotting.R: to plot CPDAG, could be put in utils?
+
 utils.R: some util functions
 
 
