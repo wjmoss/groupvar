@@ -1,5 +1,5 @@
 #generate a DAG with a given adjacency probability
-GenerateGraph_prob <- function(p, prob, max.in.degree=Inf, names=paste("V", 1:p, sep="")){
+GenerateGraph_prob <- function(p, prob, names=paste("V", 1:p, sep="")){
   mg <- matrix(0, p, p)
   for(j in 1:(p-1)){
     for(i in (j+1):p){
@@ -121,10 +121,10 @@ isFaithful <- function(mg, Lhat, Ohat, Shat, faithful.eps) {
 
 
 # generate ground truth
-GenerateGT <- function(p, prob, part, max.in.degree=Inf, Oscale=1, faithful.eps=0, paramsign = "posneg"){
+GenerateGT <- function(p, prob, part, Oscale=1, faithful.eps=0, paramsign = "posneg"){
   res <- list()
   #res$mg <- GenerateGraph(p, N=1, max.in.degree=max.in.degree)[[1]]
-  res$mg <- GenerateGraph_prob(p, prob, max.in.degree=max.in.degree)
+  res$mg <- GenerateGraph_prob(p, prob)
   res$params <- GenerateParams(mg=res$mg, part=part, Oscale=Oscale, paramsign = paramsign)
   while (! isFaithful(res$mg, t(res$params$L), res$params$O, GetSigma(res$params), 10*faithful.eps)$flag) {
     print("Ground Truth not faithgful - regenerating...")
