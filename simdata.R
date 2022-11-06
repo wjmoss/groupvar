@@ -69,7 +69,7 @@ for (r in 1:replicate){
 
   ## generate ground truth
   if (randomgraph){
-    gt <- GenerateGT(p, prob=prob, part, max.in.degree=2, Oscale, faithful.eps=faithful.eps)
+    gt <- GenerateGT(p, prob=prob, part, Oscale, faithful.eps=faithful.eps)
   } else{
     # tbd: load some 0-1 matrix data?
     G <- matrix(0, p, p)
