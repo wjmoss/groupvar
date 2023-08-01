@@ -152,18 +152,18 @@ computeSHD <- function(mg1, mg2, reversal=1){
   s2 <- mg2 + t(mg2)
   s1[s1 == 2] <- 1
   s2[s2 == 2] <- 1
-  ds <- s1 - s2
-  ind <- which(ds > 0)
+  ds <- s1 - s2 # diff in skeleton
+  ind <- which(ds > 0) # (i,j) connected in g1 not in g2
   mg1[ind] <- 0
   shd <- shd + length(ind) / 2
-  ind <- which(ds < 0)
+  ind <- which(ds < 0) # (i,j) connected in g2 not in g1
   mg1[ind] <- mg2[ind]
   shd <- shd + length(ind) / 2
-  d <- abs(mg1 - mg2)
+  d <- abs(mg1 - mg2) # same adjacency but diffedent directions
   if (reversal == 1){
     shd + sum((d + t(d)) > 0)/2 #this line is for classical shd, same as that in pcalg
   } else {
-    shd + sum((d + t(d)) > 0) # dist+=2 for each pair of reversed edges
+    shd + sum(d > 0) # dist+=2 for each pair of reversed edges
   }
 }
 
